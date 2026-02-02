@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT History Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #212121;
+      --bg-secondary: #171717;
+      --bg-tertiary: #2f2f2f;
+      --bg-hover: #3a3a3a;
+      --bg-topic: #262626;
+      --text-primary: #ececec;
+      --text-secondary: #b4b4b4;
+      --text-muted: #8e8e8e;
+      --border-color: #3a3a3a;
+      --accent-color: #10a37f;
+      --accent-secondary: #5436da;
+      --user-bubble: #2f2f2f;
+      --assistant-bubble: transparent;
+    }
+
+    body {
+      font-family: 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      width: 300px;
+      min-width: 300px;
+      background-color: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .sidebar-header .logo {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-color);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .search-box {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .search-box input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .folder-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .folder-tree::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .folder-tree::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .folder-tree::-webkit-scrollbar-thumb {
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+    }
+
+    .folder {
+      user-select: none;
+    }
+
+    .folder-header {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      cursor: pointer;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+
+    .folder-header:hover {
+      background: var(--bg-hover);
+    }
+
+    .folder-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      transition: transform 0.2s;
+    }
+
+    .folder-icon.expanded {
+      transform: rotate(90deg);
+    }
+
+    .folder-name {
+      flex: 1;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .folder-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .folder-children {
+      display: none;
+      padding-left: 12px;
+    }
+
+    .folder-children.expanded {
+      display: block;
+    }
+
+    .sub-category {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px 8px 28px;
+      cursor: pointer;
+      gap: 8px;
+      transition: background 0.15s;
+      border-left: 2px solid transparent;
+    }
+
+    .sub-category:hover {
+      background: var(--bg-hover);
+    }
+
+    .sub-category.active {
+      background: var(--bg-tertiary);
+      border-left-color: var(--accent-color);
+    }
+
+    .sub-category-icon {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .sub-category-name {
+      flex: 1;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-secondary);
+    }
+
+    .sub-category-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Main Content Styles */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-primary);
+      overflow: hidden;
+    }
+
+    .content-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .content-header h2 {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .content-header .breadcrumb {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .content-header .breadcrumb span {
+      color: var(--accent-color);
+    }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .chat-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb {
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+    }
+
+    .welcome-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .welcome-message .icon {
+      width: 64px;
+      height: 64px;
+      background: var(--bg-tertiary);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      font-size: 28px;
+    }
+
+    .welcome-message h3 {
+      font-size: 20px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .welcome-message p {
+      font-size: 14px;
+      max-width: 400px;
+    }
+
+    /* Topic Section Styles */
+    .topic-section {
+      margin-bottom: 32px;
+      background: var(--bg-topic);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .topic-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .topic-header:hover {
+      background: var(--bg-hover);
+    }
+
+    .topic-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .topic-number {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-color);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .topic-title {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .topic-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .topic-toggle {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      transform: rotate(-90deg);
+    }
+
+    .topic-toggle.expanded {
+      transform: rotate(0deg);
+    }
+
+    .topic-content {
+      padding: 16px 20px;
+      display: none;
+    }
+
+    .topic-content.expanded {
+      display: block;
+    }
+
+    .qa-pair {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .qa-pair:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .message {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .message:last-child {
+      margin-bottom: 0;
+    }
+
+    .message-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .message.user .message-avatar {
+      background: var(--accent-secondary);
+    }
+
+    .message.assistant .message-avatar {
+      background: var(--accent-color);
+    }
+
+    .message-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .message-role {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .message-timestamp {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .message-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message-text code {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Söhne Mono', Monaco, 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .message-text pre {
+      background: var(--bg-secondary);
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+
+    .message-text pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      padding: 12px 16px;
+      background: var(--bg-tertiary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Single topic (no grouping needed) - show content directly */
+    .single-topic .topic-header {
+      display: none;
+    }
+
+    .single-topic .topic-content {
+      padding: 0;
+      display: block;
+    }
+
+    /* Conversation info */
+    .conversation-info {
+      padding: 16px 20px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .conversation-info-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .conversation-info .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .conversation-info .info-label {
+      color: var(--text-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 260px;
+        min-width: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">G</div>
+        <h1>GPT History</h1>
+      </div>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search conversations...">
+      </div>
+      <div class="folder-tree" id="folderTree">
+        <!-- Folders will be populated here -->
+      </div>
+      <div class="stats-bar">
+        <div class="stat">
+          <span>Categories:</span>
+          <span class="stat-value" id="totalCategories">0</span>
+        </div>
+        <div class="stat">
+          <span>Q&As:</span>
+          <span class="stat-value" id="totalQA">0</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="content-header" id="contentHeader">
+        <h2 id="contentTitle">Welcome</h2>
+        <div class="breadcrumb" id="breadcrumb"></div>
+      </div>
+      <div class="chat-container" id="chatContainer">
+        <div class="welcome-message">
+          <div class="icon">💬</div>
+          <h3>Your ChatGPT History</h3>
+          <p>Select a conversation from the sidebar to view your Q&A pairs organized by topics. Browse through categories to find what you're looking for.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let chatData = null;
+    let currentSubCategory = null;
+
+    // Load the JSON data
+    async function loadData() {
+      try {
+        // Try to load the version with topics first
+        let response = await fetch('categorized_chats_with_topics.json');
+        if (!response.ok) {
+          response = await fetch('categorized_chats.json');
+        }
+        chatData = await response.json();
+        renderFolderTree();
+        updateStats();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        document.getElementById('folderTree').innerHTML = `
+          <div style="padding: 20px; color: var(--text-muted); text-align: center;">
+            <p>Error loading data.</p>
+            <p style="font-size: 12px; margin-top: 8px;">Make sure categorized_chats_with_topics.json is in the same folder.</p>
+          </div>
+        `;
+      }
+    }
+
+    function updateStats() {
+      if (!chatData) return;
+      document.getElementById('totalCategories').textContent = chatData.summary.total_broad_categories;
+      document.getElementById('totalQA').textContent = chatData.summary.total_qa_pairs.toLocaleString();
+    }
+
+    function renderFolderTree(filter = '') {
+      const container = document.getElementById('folderTree');
+      container.innerHTML = '';
+
+      const hierarchy = chatData.hierarchy;
+      const filterLower = filter.toLowerCase();
+
+      for (const [broadCategory, data] of Object.entries(hierarchy)) {
+        const subCategories = Object.entries(data.sub_categories);
+
+        // Filter sub-categories if search is active
+        const filteredSubs = filter
+          ? subCategories.filter(([name, convs]) => {
+              const nameMatch = name.toLowerCase().includes(filterLower);
+              const qaMatch = convs.some(conv => {
+                // Check in topics if available
+                if (conv.topics) {
+                  return conv.topics.some(topic =>
+                    topic.qa_pairs.some(qa =>
+                      qa.question.toLowerCase().includes(filterLower) ||
+                      qa.answer.toLowerCase().includes(filterLower)
+                    )
+                  );
+                }
+                // Fallback to qa_pairs
+                return conv.qa_pairs && conv.qa_pairs.some(qa =>
+                  qa.question.toLowerCase().includes(filterLower) ||
+                  qa.answer.toLowerCase().includes(filterLower)
+                );
+              });
+              return nameMatch || qaMatch;
+            })
+          : subCategories;
+
+        if (filter && filteredSubs.length === 0) continue;
+
+        const folder = document.createElement('div');
+        folder.className = 'folder';
+
+        const header = document.createElement('div');
+        header.className = 'folder-header';
+        header.innerHTML = `
+          <div class="folder-icon">▶</div>
+          <span class="folder-name">${escapeHtml(broadCategory)}</span>
+          <span class="folder-count">${filteredSubs.length}</span>
+        `;
+
+        const children = document.createElement('div');
+        children.className = 'folder-children';
+
+        for (const [subName, conversations] of filteredSubs) {
+          let totalQA = 0;
+          conversations.forEach(conv => {
+            if (conv.topics) {
+              conv.topics.forEach(topic => {
+                totalQA += topic.qa_pairs.length;
+              });
+            } else if (conv.qa_pairs) {
+              totalQA += conv.qa_pairs.length;
+            }
+          });
+
+          const subItem = document.createElement('div');
+          subItem.className = 'sub-category';
+          subItem.dataset.broad = broadCategory;
+          subItem.dataset.sub = subName;
+          subItem.innerHTML = `
+            <span class="sub-category-icon">📄</span>
+            <span class="sub-category-name" title="${escapeHtml(subName)}">${escapeHtml(subName)}</span>
+            <span class="sub-category-count">${totalQA}</span>
+          `;
+
+          subItem.addEventListener('click', () => selectSubCategory(broadCategory, subName));
+          children.appendChild(subItem);
+        }
+
+        header.addEventListener('click', () => {
+          const icon = header.querySelector('.folder-icon');
+          icon.classList.toggle('expanded');
+          children.classList.toggle('expanded');
+        });
+
+        // Auto-expand if filter is active
+        if (filter) {
+          header.querySelector('.folder-icon').classList.add('expanded');
+          children.classList.add('expanded');
+        }
+
+        folder.appendChild(header);
+        folder.appendChild(children);
+        container.appendChild(folder);
+      }
+    }
+
+    function selectSubCategory(broadCategory, subName) {
+      // Update active state
+      document.querySelectorAll('.sub-category').forEach(el => el.classList.remove('active'));
+      const activeEl = document.querySelector(`.sub-category[data-broad="${CSS.escape(broadCategory)}"][data-sub="${CSS.escape(subName)}"]`);
+      if (activeEl) activeEl.classList.add('active');
+
+      currentSubCategory = { broad: broadCategory, sub: subName };
+
+      // Update header
+      document.getElementById('contentTitle').textContent = subName;
+      document.getElementById('breadcrumb').innerHTML = `<span>${escapeHtml(broadCategory)}</span> / ${escapeHtml(subName)}`;
+
+      // Render Q&A pairs with topics
+      renderConversationWithTopics(broadCategory, subName);
+    }
+
+    function renderConversationWithTopics(broadCategory, subName) {
+      const container = document.getElementById('chatContainer');
+      const conversations = chatData.hierarchy[broadCategory].sub_categories[subName];
+
+      if (!conversations || conversations.length === 0) {
+        container.innerHTML = '<div class="welcome-message"><p>No Q&A pairs found.</p></div>';
+        return;
+      }
+
+      let html = '';
+
+      for (const conv of conversations) {
+        // Conversation info header
+        const totalQA = conv.topics
+          ? conv.topics.reduce((sum, t) => sum + t.qa_pairs.length, 0)
+          : (conv.qa_pairs ? conv.qa_pairs.length : 0);
+        const topicCount = conv.topics ? conv.topics.length : 1;
+
+        html += `
+          <div class="conversation-info">
+            <div class="conversation-info-left">
+              <div class="info-item">
+                <span class="info-label">Created:</span>
+                <span>${escapeHtml(conv.created)}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Topics:</span>
+                <span>${topicCount}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Q&As:</span>
+                <span>${totalQA}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Render topics
+        if (conv.topics && conv.topics.length > 0) {
+          const isSingleTopic = conv.topics.length === 1;
+
+          conv.topics.forEach((topic, idx) => {
+            const topicClass = isSingleTopic ? 'topic-section single-topic' : 'topic-section';
+            html += `
+              <div class="${topicClass}" data-topic-idx="${idx}">
+                <div class="topic-header" onclick="toggleTopic(this)">
+                  <div class="topic-header-left">
+                    <div class="topic-number">${idx + 1}</div>
+                    <div>
+                      <div class="topic-title">${escapeHtml(topic.topic_name)}</div>
+                      <div class="topic-meta">${topic.qa_pairs.length} Q&A${topic.qa_pairs.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                  <div class="topic-toggle">▼</div>
+                </div>
+                <div class="topic-content">
+                  ${renderQAPairs(topic.qa_pairs)}
+                </div>
+              </div>
+            `;
+          });
+        } else if (conv.qa_pairs) {
+          // Fallback for data without topics
+          html += `
+            <div class="topic-section single-topic">
+              <div class="topic-content">
+                ${renderQAPairs(conv.qa_pairs)}
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = html;
+      container.scrollTop = 0;
+    }
+
+    function renderQAPairs(qaPairs) {
+      let html = '';
+      for (const qa of qaPairs) {
+        html += `
+          <div class="qa-pair">
+            <div class="message user">
+              <div class="message-avatar">You</div>
+              <div class="message-content">
+                <div class="message-role">
+                  You
+                  <span class="message-timestamp">${escapeHtml(qa.timestamp)}</span>
+                </div>
+                <div class="message-text">${formatMessage(qa.question)}</div>
+              </div>
+            </div>
+            <div class="message assistant">
+              <div class="message-avatar">AI</div>
+              <div class="message-content">
+                <div class="message-role">ChatGPT</div>
+                <div class="message-text">${formatMessage(qa.answer)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      return html;
+    }
+
+    function toggleTopic(header) {
+      const toggle = header.querySelector('.topic-toggle');
+      const content = header.nextElementSibling;
+
+      toggle.classList.toggle('expanded');
+      content.classList.toggle('expanded');
+    }
+
+    function formatMessage(text) {
+      if (!text) return '';
+
+      // Escape HTML first
+      let formatted = escapeHtml(text);
+
+      // Format code blocks
+      formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre><code>${code.trim()}</code></pre>`;
+      });
+
+      // Format inline code
+      formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Format bold
+      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+      // Format italic
+      formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+      return formatted;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const filter = e.target.value.trim();
+      renderFolderTree(filter);
+    });
+
+    // Initialize
+    loadData();
+  </script>
+</body>
+</html>
